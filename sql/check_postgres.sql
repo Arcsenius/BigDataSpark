@@ -1,0 +1,9 @@
+select count(*) as raw_rows from mock_data;
+select count(*) as customers from dim_customer;
+select count(*) as sellers from dim_seller;
+select count(*) as products from dim_product;
+select count(*) as stores from dim_store;
+select count(*) as suppliers from dim_supplier;
+select count(*) as dates from dim_date;
+select count(*) as facts from fact_sales;
+select sum(sale_total_price) as fact_revenue from fact_sales;

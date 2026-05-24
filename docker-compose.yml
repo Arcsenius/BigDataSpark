@@ -1,0 +1,66 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: bigdataspark-postgres
+    environment:
+      POSTGRES_DB: pet_sales
+      POSTGRES_USER: spark
+      POSTGRES_PASSWORD: spark
+    ports:
+      - "55433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U spark -d pet_sales"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8
+    container_name: bigdataspark-clickhouse
+    environment:
+      CLICKHOUSE_DB: pet_sales_reports
+      CLICKHOUSE_USER: spark
+      CLICKHOUSE_PASSWORD: spark
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    ports:
+      - "8124:8123"
+      - "9002:9000"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--user", "spark", "--password", "spark", "--query", "SELECT 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  spark:
+    image: apache/spark:3.5.5
+    container_name: bigdataspark-spark
+    user: root
+    environment:
+      SPARK_MODE: client
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: pet_sales
+      POSTGRES_USER: spark
+      POSTGRES_PASSWORD: spark
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: "8123"
+      CLICKHOUSE_DB: pet_sales_reports
+      CLICKHOUSE_USER: spark
+      CLICKHOUSE_PASSWORD: spark
+      INPUT_PATH: /app/исходные данные/*.csv
+    working_dir: /app
+    volumes:
+      - ./:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  clickhouse_data:

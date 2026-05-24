@@ -85,3 +85,93 @@
 7. Код Apache Spark трансформации данных из снежинки/звезды в отчеты в Neo4j.
 8. Код Apache Spark трансформации данных из снежинки/звезды в отчеты в MongoDB.
 9. Код Apache Spark трансформации данных из снежинки/звезды в отчеты в Valkey.
+
+## Реализация в этом репозитории
+
+Реализована обязательная часть лабораторной работы:
+
+1. PostgreSQL с raw-таблицей `mock_data` и моделью звезда.
+2. Spark ETL на PySpark.
+3. ClickHouse с 6 отдельными таблицами отчетов.
+
+Опциональные Cassandra, Neo4j, MongoDB и Valkey не реализованы.
+
+## Запуск
+
+Поднять PostgreSQL и ClickHouse:
+
+```bash
+docker compose up -d postgres clickhouse
+```
+
+Запустить Spark ETL:
+
+```bash
+docker compose run --rm spark /opt/spark/bin/spark-submit --packages org.postgresql:postgresql:42.7.3 jobs/run_etl.py
+```
+
+ETL выполняет полный цикл:
+
+1. Читает 10 CSV-файлов из папки `исходные данные`.
+2. Загружает 10000 строк в PostgreSQL-таблицу `mock_data`.
+3. Создает в PostgreSQL таблицы `dim_customer`, `dim_seller`, `dim_supplier`, `dim_product`, `dim_store`, `dim_date`, `fact_sales`.
+4. Создает в ClickHouse таблицы `report_product_sales`, `report_customer_sales`, `report_time_sales`, `report_store_sales`, `report_supplier_sales`, `report_product_quality`.
+
+## Подключения
+
+PostgreSQL:
+
+```text
+host: localhost
+port: 55433
+database: pet_sales
+user: spark
+password: spark
+```
+
+ClickHouse HTTP:
+
+```text
+host: localhost
+port: 8124
+database: pet_sales_reports
+user: spark
+password: spark
+```
+
+ClickHouse native:
+
+```text
+host: localhost
+port: 9002
+database: pet_sales_reports
+user: spark
+password: spark
+```
+
+## Проверка
+
+Проверить PostgreSQL:
+
+```bash
+docker compose exec -T postgres psql -U spark -d pet_sales -c "select count(*) as raw_rows from mock_data; select count(*) as facts from fact_sales; select sum(sale_total_price) as fact_revenue from fact_sales;"
+```
+
+Проверить ClickHouse:
+
+```bash
+docker compose exec -T clickhouse clickhouse-client --user spark --password spark --database pet_sales_reports --query "select 'report_product_sales' as table_name, count(*) as rows from report_product_sales union all select 'report_customer_sales', count(*) from report_customer_sales union all select 'report_time_sales', count(*) from report_time_sales union all select 'report_store_sales', count(*) from report_store_sales union all select 'report_supplier_sales', count(*) from report_supplier_sales union all select 'report_product_quality', count(*) from report_product_quality"
+```
+
+Дополнительные SQL-запросы для ручной проверки лежат в `sql/check_postgres.sql` и `sql/check_clickhouse.sql`.
+
+## Чеклист готовности
+
+1. В репозитории есть 10 исходных CSV-файлов по 1000 записей.
+2. Есть `docker-compose.yml` с PostgreSQL, Spark и ClickHouse.
+3. Есть инструкция запуска Spark job.
+4. Есть Spark-код трансформации исходных данных в модель звезда в PostgreSQL: `jobs/run_etl.py`.
+5. Есть Spark-код построения 6 отчетов в ClickHouse: `jobs/run_etl.py`.
+6. PostgreSQL после запуска содержит `mock_data` на 10000 строк и `fact_sales` на 10000 строк.
+7. ClickHouse после запуска содержит 6 непустых таблиц отчетов.
+8. Cassandra, Neo4j, MongoDB и Valkey не входят в реализованную обязательную часть.
